@@ -6,6 +6,8 @@ import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 
+import com.alibaba.fastjson.JSON;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -19,6 +21,7 @@ import io.reactivex.ObservableOnSubscribe;
 import io.reactivex.Observer;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Consumer;
 import io.reactivex.schedulers.Schedulers;
 
 public class MainActivity extends AppCompatActivity {
@@ -34,46 +37,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onClick(View v) {
-        Observable.create(new ObservableOnSubscribe<String>() {
-            @Override
-            public void subscribe(ObservableEmitter<String> emitter) throws Exception {
-
-                emitter.onNext(httpRequest());
-
-            }
-        })
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(new Observer<String>() {
-                    @Override
-                    public void onSubscribe(Disposable d) {
-                        Log.d("wy","onSubscribe-->"+d.toString());
-                    }
-
-                    @Override
-                    public void onNext(String s) {
-                        textView.setText(s);
-                    }
-
-                    @Override
-                    public void onError(Throwable e) {
-                        Log.e("wy","onError",e);
-                    }
-
-                    @Override
-                    public void onComplete() {
-                        Log.d("wy","onComplete");
-                    }
-                });
+        Observable.create((ObservableOnSubscribe<String>) emitter -> emitter.onNext(httpRequest("https://wycode.cn/web/api/public/hello?message=Hello"))) //1.
+                .map(s -> JSON.parseObject(s,Message.class)) //解析JSON
+                .subscribeOn(Schedulers.io()) //2.
+                .observeOn(AndroidSchedulers.mainThread()) //3.
+                .subscribe(message -> textView.setText(message.message)); //4.
     }
 
-    private String httpRequest() throws Exception {
-        URL url = new URL("http://wycode.cn/");
+    private String httpRequest(String urlString) throws Exception {
+        URL url = new URL(urlString);
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-        String result;
+        String result = null;
         try {
             BufferedInputStream in = new BufferedInputStream(urlConnection.getInputStream());
             result = readStream(in);
+        }catch (Exception e){
+            e.printStackTrace();
         } finally {
             urlConnection.disconnect();
         }
@@ -83,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
     private String readStream(BufferedInputStream in) {
         BufferedReader reader = new BufferedReader(new InputStreamReader(in));
         StringBuilder sb = new StringBuilder();
-        String line = null;
+        String line;
         try {
             while ((line = reader.readLine()) != null) {
                 sb.append(line).append("\n");
@@ -98,5 +77,9 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         return sb.toString();
+    }
+
+    public static class Message{
+        public String message;
     }
 }
